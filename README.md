@@ -1,80 +1,319 @@
+
 # ML-KEM ASIC Accelerator
 
-A synthesizable, ASIC-ready hardware accelerator for ML-KEM polynomial arithmetic. This repository contains the SystemVerilog design and simulation files for a high-throughput, pipelined Number Theoretic Transform (NTT) computation engine.
+<p align="center">
+  <img src="docs/images/top_architecture.png" width="900">
+</p>
 
-## Overview
+<p align="center">
+  <b>A SystemVerilog-Based ASIC Accelerator for ML-KEM Featuring Parallel NTT/INTT Butterfly Processing, a Hierarchical Kaleidoscope Cluster Architecture, and Division-Free Modular Reduction.</b>
+</p>
 
-This project aims to develop a specialized hardware accelerator for ML-KEM, utilizing a two-tier hybrid design that yields a 57.1% reduction in global memory bandwidth. The architecture exploits parallel NTT/INTT butterfly processing and incorporates custom Address Generation Units (AGUs) and division-free K2RED modular reduction to optimize hardware cost and latency while ensuring constant-time execution to minimize timing-dependent security leakages.
+<p align="center">
+  <img src="https://img.shields.io/badge/Language-SystemVerilog-blue.svg">
+  <img src="https://img.shields.io/badge/Target-ASIC-success.svg">
+  <img src="https://img.shields.io/badge/Algorithm-ML--KEM-orange.svg">
+  <img src="https://img.shields.io/badge/Transform-NTT%2FINTT-red.svg">
+  <img src="https://img.shields.io/badge/Modulus-3329-purple.svg">
+  <img src="https://img.shields.io/badge/Status-In%20Development-yellow.svg">
+</p>
 
-## Repository Structure
+---
 
-* **`NTT Design/`**: Contains the SystemVerilog RTL source code for the ML-KEM NTT engine, Kaleidoscope Clusters, Butterfly Units, and modular arithmetic components.
+## Table of Contents
 
-* **`NTT Sim/`**: Contains the simulation and testbench files used to verify the functional correctness of the RTL modules.
+- [Overview](#overview)
+- [Motivation](#motivation)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [Kaleidoscope Cluster](#kaleidoscope-cluster)
+- [Pipelined Butterfly Unit](#pipelined-butterfly-unit)
+- [Modular Arithmetic](#modular-arithmetic)
+- [Execution Strategy](#execution-strategy)
+- [Current Progress](#current-progress)
+- [Verification](#verification)
+- [Repository Structure](#repository-structure)
+- [Future Work](#future-work)
+- [Getting Started](#getting-started)
+- [Author](#author)
+- [License](#license)
 
-## Proposed Architecture
+---
 
-### 1. Top Level Architecture (NTT Engine)
+# Overview
 
-The top-level execution engine consists of a Main Control Unit, a Global AGU, Global SRAM, ROM for twiddle factors, and **four independent Kaleidoscope Clusters**.
+This repository contains the SystemVerilog RTL implementation and simulation environment for an ASIC-oriented hardware accelerator for ML-KEM polynomial arithmetic.
 
-![Top Level Block Diagram of the FNTT/INTT Computation Engine](top.png)
+The proposed architecture combines a hierarchical memory organization with four parallel Kaleidoscope Clusters, each containing eight butterfly units. The design integrates pipelined NTT/INTT computation, custom address generation, and division-free K2RED modular reduction to improve computational efficiency and reduce global memory traffic.
 
-### 2. The Kaleidoscope Cluster
+The accelerator targets efficient implementation of the polynomial arithmetic required by ML-KEM, standardized in NIST FIPS 203.
 
-The heart of the architecture, each cluster operates autonomously to handle localized polynomial arithmetic. 
+---
 
-![Kaleidoscope Cluster](kaleidoscope_arch.png)
+# Motivation
 
-It features:
-* **KC FSM**: Drives a continuous 20-cycle depth-first execution loop (LOAD $\rightarrow$ COMPUTE $\rightarrow$ STORE).
-* **L_AGU (Local AGU)**: Utilizes bit-weaving for zero-adder dynamic stride generation.
-* **8 Parallel Butterfly Units (BUs)**: Ensures 100% hardware utilization with zero pipeline stalls.
-* **Shared L1 Cache**: Traps 64-word blocks natively for localized operations.
+ML-KEM relies on polynomial arithmetic over the finite field defined by the modulus \(q = 3329\). Its computational workload includes repeated modular multiplication, addition, subtraction, and NTT/INTT butterfly operations.
 
-**Internal Block Diagram:**
-![Internal Block Diagram of the Kaleidoscope Unit](kaleidoscope_internal.png)
+Implementing these operations efficiently in hardware presents several challenges:
 
-### 3. Pipelined Butterfly Unit
+- High computational demand from polynomial transformations
+- Significant data movement between memory and processing units
+- Complex coefficient addressing across NTT stages
+- Hardware overhead associated with modular reduction
+- The need for predictable execution in security-sensitive cryptographic hardware
 
-A 4-stage reconfigurable pipelined data path consisting of:
-1. Modular Adder & Subtractor
-2. Dynamic Input Router & Twiddle Factor Synchronization
-3. Division-Free K2RED Reduction Unit
-4. Output Selection Router
+This project explores a parallel, memory-efficient architecture using localized computation, hierarchical address generation, and optimized modular arithmetic.
 
-![Internal Block Diagram of the pipelined reconfigurable butterfly unit](butterfly_unit.png)
+---
 
-**NTT Butterfly Operation:**
-For each pair $(A,B)$ with twiddle factor $W$:
-$A^{\prime} = (A + BW) \mod q$
-$B^{\prime} = (A - BW) \mod q$
+# Key Features
 
-**INTT Butterfly Operation:**
-$A^{\prime} = (A + B) \mod q$
-$B^{\prime} = (A - B)W^{-1} \mod q$
-*(where* $q = 3329$ *is the ML-KEM modulus)*
+- Four parallel Kaleidoscope Clusters
+- Eight butterfly units per cluster
+- Forward NTT and inverse NTT butterfly processing
+- Four-stage pipelined butterfly datapath
+- Division-free K2RED modular reduction
+- Hierarchical global and local address generation
+- Localized polynomial data processing
+- FSM-controlled cluster execution
+- SystemVerilog RTL implementation
+- Simulation-based functional verification
+- ASIC-oriented architecture
 
-## Execution Scenarios
+---
 
-The hybrid architecture utilizes three execution phases:
+# Architecture
 
-* **Global Horizontal**: The Global-AGU sweeps the 256-coefficient polynomial horizontally for Layers 0 & 1 (Strides 128, 64).
-* **Local Horizontal**: The polynomial fractures into 64-word blocks stored in L1 Cache. The L_AGU sweeps Strides 32 & 16.
-* **Interleaved Horizontal**: The L_AGU weaves four 16-word sub-blocks continuously to mask the 4-cycle Butterfly Unit latency (Layers 4, 5, 6).
+## Top-Level Architecture
 
-## Current Progress (Verified Work)
+<p align="center">
+  <img src="docs/images/top_architecture.png" width="900">
+</p>
 
-The following blocks have been successfully implemented in SystemVerilog and verified via RTL simulation:
+The proposed NTT engine consists of:
 
-* **Modular Arithmetic Blocks**: Modular addition, subtraction, multiplication, and division-free K2RED modular reduction.
-* **Butterfly Units**: Both Forward NTT and INTT butterfly operations with correct data paths.
-* **Local Address Generation Unit (L-AGU)**: Verified local coefficient addressing and stride/access patterns.
-* **Kaleidoscope Cluster FSM**: Proper synchronization of LOAD, COMPUTE, and STORE states.
+- Main Control Unit
+- Global Address Generation Unit (Global AGU)
+- Global SRAM
+- Twiddle-Factor ROM
+- Four parallel Kaleidoscope Clusters
+- Local storage and butterfly processing units
 
-## Future Work
+The Global AGU manages polynomial addressing at the system level, while the clusters perform localized arithmetic operations. This two-tier organization aims to reduce repeated global memory accesses and improve processing-unit utilization.
 
-* **Point-wise Multiplication Unit**: To multiply the NTT transformed polynomial vectors.
-* **Global AGU & Global Control Logic**: Develop FSM and address generation units to coordinate pipeline execution and reduce routing bottlenecks.
-* **Constant Time Execution Validation**: Strict guarantees against side-channel leaks.
-* **Complete ASIC Evaluation**: Full RTL synthesis and extraction of Area, Power, Timing, Throughput, and Latency metrics.
+---
+
+## Kaleidoscope Cluster
+
+<p align="center">
+  <img src="docs/images/kaleidoscope_arch.png" width="800">
+</p>
+
+Each Kaleidoscope Cluster is an autonomous compute unit responsible for localized polynomial processing.
+
+Its primary components include:
+
+- **Cluster FSM:** Coordinates LOAD, COMPUTE, and STORE phases.
+- **Local AGU:** Generates local coefficient addresses and access strides.
+- **Eight Butterfly Units:** Execute parallel modular arithmetic operations.
+- **Local Storage:** Holds the coefficients and intermediate data needed for computation.
+
+### Internal Cluster Architecture
+
+<p align="center">
+  <img src="docs/images/kaleidoscope_internal.png" width="800">
+</p>
+
+The cluster controller coordinates data movement and arithmetic execution. Local address generation supports stage-dependent coefficient access patterns.
+
+---
+
+## Pipelined Butterfly Unit
+
+<p align="center">
+  <img src="docs/images/butterfly_unit.png" width="750">
+</p>
+
+The butterfly unit implements a four-stage datapath designed for modular arithmetic and synchronized data routing.
+
+### Pipeline Stages
+
+1. Modular addition and subtraction
+2. Dynamic input routing and twiddle-factor synchronization
+3. Division-free K2RED modular reduction
+4. Output selection and routing
+
+### Forward NTT Butterfly
+
+For input coefficients \(A\), \(B\), and twiddle factor \(W\):
+
+\[
+A' = (A + BW) \bmod q
+\]
+
+\[
+B' = (A - BW) \bmod q
+\]
+
+### Inverse NTT Butterfly
+
+\[
+A' = (A + B) \bmod q
+\]
+
+\[
+B' = (A - B)W^{-1} \bmod q
+\]
+
+where \(q = 3329\) is the ML-KEM modulus. The complete inverse transform must also account for the required normalization.
+
+---
+
+# Modular Arithmetic
+
+The accelerator uses specialized arithmetic units to perform polynomial operations efficiently.
+
+### Supported Operations
+
+- Modular addition
+- Modular subtraction
+- Modular multiplication
+- Division-free K2RED modular reduction
+
+The K2RED reduction unit is designed to reduce multiplication results modulo \(q\) without requiring a general-purpose divider.
+
+These arithmetic blocks form the foundation of the NTT/INTT butterfly datapath.
+
+---
+
+# Execution Strategy
+
+The proposed architecture divides polynomial processing into three execution phases.
+
+### 1. Global Horizontal Processing
+
+The Global AGU accesses the polynomial during early transformation stages, including strides of 128 and 64.
+
+### 2. Local Horizontal Processing
+
+The polynomial is partitioned into 64-coefficient blocks for localized processing. The Local AGU generates access patterns for stages with strides of 32 and 16.
+
+### 3. Interleaved Local Processing
+
+During later transformation stages, the Local AGU schedules accesses across smaller coefficient groups to keep the pipelined butterfly units supplied with data.
+
+The intended benefits are reduced global memory traffic, improved pipeline utilization, and efficient parallel processing.
+
+---
+
+# Current Progress
+
+The following components have been implemented in SystemVerilog and verified through RTL simulation:
+
+- **Modular Arithmetic:** Addition, subtraction, multiplication, and K2RED reduction.
+- **Forward NTT Butterfly:** Arithmetic datapath and operation verified.
+- **Inverse NTT Butterfly:** Inverse butterfly datapath and operation verified.
+- **Local AGU:** Local coefficient addressing and stride patterns verified.
+- **Kaleidoscope Cluster FSM:** LOAD, COMPUTE, and STORE sequencing verified.
+
+The complete accelerator remains under development, with system-level integration and ASIC evaluation planned as subsequent milestones.
+
+---
+
+# Verification
+
+RTL verification focuses on arithmetic correctness, address generation, data routing, and controller behavior.
+
+### Verification Coverage
+
+- Modular arithmetic operations
+- K2RED modular reduction
+- Forward NTT butterfly
+- Inverse NTT butterfly
+- Local AGU address generation
+- Cluster FSM sequencing
+- Individual RTL module simulation
+
+Full accelerator-level verification, including end-to-end polynomial transformations and integrated control, remains part of the planned work.
+
+---
+
+# Repository Structure
+
+```text
+.
+├── NTT Design/
+│   └── SystemVerilog RTL source files
+│
+├── NTT Sim/
+│   └── Testbenches and simulation files
+│
+├── docs/
+│   └── images/
+│       ├── top_architecture.png
+│       ├── kaleidoscope_arch.png
+│       ├── kaleidoscope_internal.png
+│       └── butterfly_unit.png
+│
+├── README.md
+└── LICENSE
+```
+
+---
+
+# Future Work
+
+Planned improvements include:
+
+- Point-wise polynomial multiplication
+- Global AGU and global control logic
+- Complete accelerator integration
+- End-to-end NTT/INTT verification
+- Constant-time execution analysis and validation
+- Full RTL synthesis and ASIC evaluation
+- Area, power, timing, throughput, and latency analysis
+
+---
+
+# Getting Started
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/svsBishal/neu_em_a_ml_kem_asic_accelerator_.git
+
+cd neu_em_a_ml_kem_asic_accelerator_
+```
+
+## Run Simulation
+
+1. Open the RTL files in `NTT Design/`.
+2. Locate the relevant testbenches in `NTT Sim/`.
+3. Compile the required SystemVerilog modules using your preferred simulator.
+4. Run the testbench and inspect the simulation results.
+
+Supported simulators may include:
+
+- ModelSim / QuestaSim
+- Vivado Simulator
+- Synopsys VCS
+- Cadence Xcelium
+
+The exact compile commands depend on the selected testbench and its module dependencies.
+
+---
+
+# Author
+
+**Bishal Sarma**
+
+Department of Electronics and Communication Engineering  
+National Institute of Technology Silchar
+
+GitHub: [svsBishal](https://github.com/svsBishal)
+
+---
+
+# License
+
+Add the appropriate license file to specify the terms under which this project may be used, modified, and distributed.

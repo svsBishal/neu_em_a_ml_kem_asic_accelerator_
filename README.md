@@ -1,12 +1,12 @@
 
-# ML-KEM ASIC Accelerator
+# NTT Engine with Novel Kaleidoscope Cluster Architecture
 
 <p align="center">
   <img src="docs/images/top.png" width="900">
 </p>
 
 <p align="center">
-  <b>A SystemVerilog-Based ASIC Accelerator for ML-KEM Featuring Parallel NTT/INTT Butterfly Processing, a Hierarchical Kaleidoscope Cluster Architecture, and Division-Free Modular Reduction.</b>
+  <b>A SystemVerilog based, Pipelined NTT/INTT Engine Featuring Four Parallel Kaleidoscope Clusters, Hierarchical Address Generation and Division free Modular Reduction for ML-KEM Post-Quantum Cryptographic Workloads.</b>
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@
 
 This repository contains the SystemVerilog RTL implementation and simulation environment for an ASIC-oriented hardware accelerator for ML-KEM polynomial arithmetic.
 
-The proposed architecture combines a hierarchical memory organization with four parallel Kaleidoscope Clusters, each containing eight butterfly units. The design integrates pipelined NTT/INTT computation, custom address generation, and division-free K2RED modular reduction to improve computational efficiency and reduce global memory traffic.
+The proposed architecture combines a hierarchical memory organization with four parallel Kaleidoscope Clusters, each containing eight butterfly units. The design integrates pipelined NTT/INTT computation, custom address generation and division free K2RED modular reduction to improve computational efficiency and reduce global memory traffic.
 
 The accelerator targets efficient implementation of the polynomial arithmetic required by ML-KEM, standardized in NIST FIPS 203.
 
@@ -92,10 +92,9 @@ This project explores a parallel, memory-efficient architecture using localized 
 
 The proposed NTT engine consists of:
 
-- Main Control Unit
-- Global Address Generation Unit (Global AGU)
+- Main Control & Global Address Generation Unit (Global AGU)
 - Global SRAM
-- Twiddle-Factor ROM
+- Twiddle Factor ROM
 - Four parallel Kaleidoscope Clusters
 - Local storage and butterfly processing units
 

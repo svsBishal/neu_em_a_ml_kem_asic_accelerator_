@@ -2,7 +2,7 @@
 # ML-KEM ASIC Accelerator
 
 <p align="center">
-  <img src="docs/images/top_architecture.png" width="900">
+  <img src="docs/images/top.png" width="900">
 </p>
 
 <p align="center">
@@ -87,7 +87,7 @@ This project explores a parallel, memory-efficient architecture using localized 
 ## Top-Level Architecture
 
 <p align="center">
-  <img src="docs/images/top_architecture.png" width="900">
+  <img src="docs/images/top.png" width="900">
 </p>
 
 The proposed NTT engine consists of:
